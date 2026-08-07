@@ -1,0 +1,9 @@
+{
+  "name": "shadow-tizenbrew",
+  "version": "1.0.0",
+  "packageType": "app",
+  "appName": "Shadow PC",
+  "appPath": "app/index.html",
+  "keys": [],
+  "description": "Shadow PC cloud gaming/computer sur Tizen TV via TizenBrew"
+}
