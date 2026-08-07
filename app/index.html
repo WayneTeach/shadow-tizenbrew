@@ -1,168 +1,158 @@
 <!doctype html>
-<html lang="fr">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1.0">
   <title>Shadow PC</title>
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0b1020;
-      --card: #141a2e;
-      --text: #f5f7ff;
-      --muted: #a8b0cc;
-      --ok: #3ddc97;
-      --warn: #ffcc66;
-      --err: #ff6b6b;
-    }
-    * { box-sizing: border-box; }
-    body {
+    html, body {
       margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
-      background: radial-gradient(1200px 800px at 20% -10%, #1c2750 0%, var(--bg) 50%);
-      color: var(--text);
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
+      padding: 0;
+      background: #0b1020;
+      color: #f5f7ff;
+      font-family: Arial, sans-serif;
     }
-    .card {
-      width: min(860px, 92vw);
-      background: color-mix(in srgb, var(--card) 88%, #000 12%);
+    #wrap {
+      width: 90%;
+      max-width: 900px;
+      margin: 60px auto;
+      background: #141a2e;
       border: 1px solid #26325e;
-      border-radius: 16px;
+      border-radius: 10px;
       padding: 24px;
-      box-shadow: 0 12px 40px rgba(0,0,0,.35);
     }
-    h1 { margin: 0 0 8px; font-size: 28px; }
-    p { margin: 6px 0; color: var(--muted); font-size: 18px; line-height: 1.4; }
-    .status { margin-top: 16px; font-size: 20px; color: var(--ok); }
-    .status.warn { color: var(--warn); }
-    .status.err { color: var(--err); }
-    .hint { margin-top: 14px; font-size: 16px; }
-    .kbd {
-      display: inline-block;
-      border: 1px solid #3a4677;
-      border-bottom-width: 2px;
-      border-radius: 6px;
-      padding: 2px 8px;
-      font-size: 14px;
-      color: #d6ddff;
-      background: #202b56;
-    }
-    .small { font-size: 14px; opacity: .9; }
+    h1 { margin: 0 0 10px 0; font-size: 34px; }
+    p { margin: 8px 0; font-size: 24px; color: #a8b0cc; }
+    #status { color: #3ddc97; font-weight: bold; }
+    #status.warn { color: #ffcc66; }
+    #status.err { color: #ff6b6b; }
+    #hint { font-size: 20px; }
+    #debug { font-size: 18px; color: #9fb0ff; }
   </style>
 </head>
 <body>
-  <main class="card">
+  <div id="wrap">
     <h1>Shadow PC</h1>
-    <p>Connexion en cours à <strong>pc.shadow.tech</strong>…</p>
-    <p id="status" class="status">Initialisation…</p>
-    <p class="hint">
-      Télécommande : <span class="kbd">Retour</span> pour quitter l’app,
-      <span class="kbd">Rouge</span> pour retenter, <span class="kbd">Vert</span> pour ouvrir la page fallback.
-    </p>
-    <p id="debug" class="small">Dernière touche: —</p>
-  </main>
+    <p>Connexion en cours à pc.shadow.tech…</p>
+    <p id="status">Initialisation…</p>
+    <p id="hint">Rouge = retenter • Vert = fallback • Return/Exit = quitter</p>
+    <p id="debug">Dernière touche: -</p>
+  </div>
 
   <script>
     (function () {
-      const SHADOW_URL = "https://pc.shadow.tech/";
-      const FALLBACK_URL = "https://shadow.tech/";
-      const CONNECT_TIMEOUT_MS = 8000;
+      var SHADOW_URL = "https://pc.shadow.tech/";
+      var FALLBACK_URL = "https://shadow.tech/";
+      var TIMEOUT_MS = 10000;
 
-      const statusEl = document.getElementById("status");
-      const debugEl = document.getElementById("debug");
-      let redirected = false;
-      let timeoutId = null;
+      var statusEl = document.getElementById("status");
+      var debugEl = document.getElementById("debug");
+      var timeoutId = null;
+      var hasNavigated = false;
 
-      function setStatus(message, tone) {
-        statusEl.textContent = message;
-        statusEl.className = "status" + (tone ? " " + tone : "");
+      function setStatus(msg, cls) {
+        statusEl.className = "";
+        if (cls) statusEl.className = cls;
+        statusEl.innerHTML = msg;
       }
 
-      function safeExitApp() {
+      function safeExit() {
         try {
-          if (window.tizen && tizen.application && tizen.application.getCurrentApplication) {
+          if (window.tizen &&
+              tizen.application &&
+              tizen.application.getCurrentApplication) {
             tizen.application.getCurrentApplication().exit();
             return;
           }
-        } catch (_) {}
-        window.close();
+        } catch (e) {}
+        try { window.close(); } catch (e2) {}
       }
 
-      function go(url) {
-        redirected = true;
+      function navigate(url) {
+        hasNavigated = true;
         window.location.href = url;
       }
 
-      function startRedirectFlow() {
-        setStatus("Test de disponibilité…", "");
-        timeoutId = setTimeout(function () {
-          if (redirected) return;
-          setStatus("Connexion lente ou bloquée. Ouverture du fallback…", "warn");
-          go(FALLBACK_URL);
-        }, CONNECT_TIMEOUT_MS);
-
-        // Tentative principale
+      function startFlow() {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        hasNavigated = false;
         setStatus("Ouverture de Shadow PC…", "");
-        go(SHADOW_URL);
+
+        timeoutId = setTimeout(function () {
+          if (hasNavigated) return;
+          setStatus("Timeout. Ouverture du fallback…", "warn");
+          navigate(FALLBACK_URL);
+        }, TIMEOUT_MS);
+
+        navigate(SHADOW_URL);
       }
 
-      // Enregistrement best-effort des touches (au cas où non géré côté hôte)
+      // Best effort key registration for Tizen
       try {
-        if (window.tizen && tizen.tvinputdevice && tizen.tvinputdevice.registerKeyBatch) {
+        if (window.tizen &&
+            tizen.tvinputdevice &&
+            tizen.tvinputdevice.registerKeyBatch) {
           tizen.tvinputdevice.registerKeyBatch([
             "ColorF0Red","ColorF1Green","ColorF2Yellow","ColorF3Blue",
             "MediaPlayPause","MediaStop","MediaFastForward","MediaRewind",
             "Return","Exit","Enter"
           ]);
         }
-      } catch (e) {
-        // Non bloquant
-      }
+      } catch (e) {}
 
       document.addEventListener("keydown", function (event) {
-        const code = event.keyCode || event.which;
-        const key = event.key || "Unknown";
-        debugEl.textContent = "Dernière touche: " + key + " (code " + code + ")";
+        var code = event.keyCode || event.which || 0;
+        var key = event.key || "Unknown";
+        debugEl.innerHTML = "Dernière touche: " + key + " (code " + code + ")";
 
-        // RETURN (10009 souvent sur Tizen) / BrowserBack
+        // Return / Back
         if (code === 10009 || key === "Backspace" || key === "BrowserBack") {
-          event.preventDefault();
+          if (event.preventDefault) event.preventDefault();
           setStatus("Fermeture de l’application…", "warn");
-          safeExitApp();
+          safeExit();
           return;
         }
 
-        // EXIT (10182 sur certains modèles)
+        // Exit
         if (code === 10182 || key === "Exit") {
-          event.preventDefault();
-          safeExitApp();
+          if (event.preventDefault) event.preventDefault();
+          safeExit();
           return;
         }
 
-        // Rouge = retry Shadow
+        // Red
         if (code === 403 || key === "ColorF0Red") {
-          event.preventDefault();
-          if (timeoutId) clearTimeout(timeoutId);
-          redirected = false;
+          if (event.preventDefault) event.preventDefault();
           setStatus("Nouvelle tentative vers Shadow PC…", "");
-          startRedirectFlow();
+          startFlow();
           return;
         }
 
-        // Vert = fallback direct
+        // Green
         if (code === 404 || key === "ColorF1Green") {
-          event.preventDefault();
-          if (timeoutId) clearTimeout(timeoutId);
+          if (event.preventDefault) event.preventDefault();
           setStatus("Ouverture du fallback…", "warn");
-          go(FALLBACK_URL);
+          if (timeoutId) clearTimeout(timeoutId);
+          navigate(FALLBACK_URL);
           return;
         }
       });
 
+      // Guard: if page becomes visible again without navigation, retry once
+      try {
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden && !hasNavigated) {
+            setStatus("Reprise… nouvelle tentative.", "");
+            startFlow();
+          }
+        });
+      } catch (e) {}
+
       setStatus("Préparation de la connexion…", "");
-      startRedirectFlow();
+      startFlow();
     })();
   </script>
 </body>
