@@ -1,9 +1,21 @@
 {
   "name": "shadow-tizenbrew",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "packageType": "app",
   "appName": "Shadow PC",
   "appPath": "app/index.html",
-  "keys": [],
+  "keys": [
+    "ColorF0Red",
+    "ColorF1Green",
+    "ColorF2Yellow",
+    "ColorF3Blue",
+    "MediaPlayPause",
+    "MediaStop",
+    "MediaFastForward",
+    "MediaRewind",
+    "Return",
+    "Exit",
+    "Enter"
+  ],
   "description": "Shadow PC cloud gaming/computer sur Tizen TV via TizenBrew"
 }

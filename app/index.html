@@ -1,12 +1,169 @@
 <!doctype html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shadow PC</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --card: #141a2e;
+      --text: #f5f7ff;
+      --muted: #a8b0cc;
+      --ok: #3ddc97;
+      --warn: #ffcc66;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
+      background: radial-gradient(1200px 800px at 20% -10%, #1c2750 0%, var(--bg) 50%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(860px, 92vw);
+      background: color-mix(in srgb, var(--card) 88%, #000 12%);
+      border: 1px solid #26325e;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    p { margin: 6px 0; color: var(--muted); font-size: 18px; line-height: 1.4; }
+    .status { margin-top: 16px; font-size: 20px; color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.err { color: var(--err); }
+    .hint { margin-top: 14px; font-size: 16px; }
+    .kbd {
+      display: inline-block;
+      border: 1px solid #3a4677;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 14px;
+      color: #d6ddff;
+      background: #202b56;
+    }
+    .small { font-size: 14px; opacity: .9; }
+  </style>
 </head>
 <body>
+  <main class="card">
+    <h1>Shadow PC</h1>
+    <p>Connexion en cours à <strong>pc.shadow.tech</strong>…</p>
+    <p id="status" class="status">Initialisation…</p>
+    <p class="hint">
+      Télécommande : <span class="kbd">Retour</span> pour quitter l’app,
+      <span class="kbd">Rouge</span> pour retenter, <span class="kbd">Vert</span> pour ouvrir la page fallback.
+    </p>
+    <p id="debug" class="small">Dernière touche: —</p>
+  </main>
+
   <script>
-    window.location.href = "https://pc.shadow.tech/";
+    (function () {
+      const SHADOW_URL = "https://pc.shadow.tech/";
+      const FALLBACK_URL = "https://shadow.tech/";
+      const CONNECT_TIMEOUT_MS = 8000;
+
+      const statusEl = document.getElementById("status");
+      const debugEl = document.getElementById("debug");
+      let redirected = false;
+      let timeoutId = null;
+
+      function setStatus(message, tone) {
+        statusEl.textContent = message;
+        statusEl.className = "status" + (tone ? " " + tone : "");
+      }
+
+      function safeExitApp() {
+        try {
+          if (window.tizen && tizen.application && tizen.application.getCurrentApplication) {
+            tizen.application.getCurrentApplication().exit();
+            return;
+          }
+        } catch (_) {}
+        window.close();
+      }
+
+      function go(url) {
+        redirected = true;
+        window.location.href = url;
+      }
+
+      function startRedirectFlow() {
+        setStatus("Test de disponibilité…", "");
+        timeoutId = setTimeout(function () {
+          if (redirected) return;
+          setStatus("Connexion lente ou bloquée. Ouverture du fallback…", "warn");
+          go(FALLBACK_URL);
+        }, CONNECT_TIMEOUT_MS);
+
+        // Tentative principale
+        setStatus("Ouverture de Shadow PC…", "");
+        go(SHADOW_URL);
+      }
+
+      // Enregistrement best-effort des touches (au cas où non géré côté hôte)
+      try {
+        if (window.tizen && tizen.tvinputdevice && tizen.tvinputdevice.registerKeyBatch) {
+          tizen.tvinputdevice.registerKeyBatch([
+            "ColorF0Red","ColorF1Green","ColorF2Yellow","ColorF3Blue",
+            "MediaPlayPause","MediaStop","MediaFastForward","MediaRewind",
+            "Return","Exit","Enter"
+          ]);
+        }
+      } catch (e) {
+        // Non bloquant
+      }
+
+      document.addEventListener("keydown", function (event) {
+        const code = event.keyCode || event.which;
+        const key = event.key || "Unknown";
+        debugEl.textContent = "Dernière touche: " + key + " (code " + code + ")";
+
+        // RETURN (10009 souvent sur Tizen) / BrowserBack
+        if (code === 10009 || key === "Backspace" || key === "BrowserBack") {
+          event.preventDefault();
+          setStatus("Fermeture de l’application…", "warn");
+          safeExitApp();
+          return;
+        }
+
+        // EXIT (10182 sur certains modèles)
+        if (code === 10182 || key === "Exit") {
+          event.preventDefault();
+          safeExitApp();
+          return;
+        }
+
+        // Rouge = retry Shadow
+        if (code === 403 || key === "ColorF0Red") {
+          event.preventDefault();
+          if (timeoutId) clearTimeout(timeoutId);
+          redirected = false;
+          setStatus("Nouvelle tentative vers Shadow PC…", "");
+          startRedirectFlow();
+          return;
+        }
+
+        // Vert = fallback direct
+        if (code === 404 || key === "ColorF1Green") {
+          event.preventDefault();
+          if (timeoutId) clearTimeout(timeoutId);
+          setStatus("Ouverture du fallback…", "warn");
+          go(FALLBACK_URL);
+          return;
+        }
+      });
+
+      setStatus("Préparation de la connexion…", "");
+      startRedirectFlow();
+    })();
   </script>
 </body>
 </html>
